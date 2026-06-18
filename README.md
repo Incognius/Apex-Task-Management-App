@@ -67,6 +67,23 @@ create policy "open updates" on updates for all using (true) with check (true);
 alter table updates add column if not exists edited_at timestamptz;
 ```
 
+### Migration for v2 features (PINs, due dates, assignees)
+If you already created the tables above, run this once in the SQL Editor to add
+the columns used by PIN login, due dates, and assignees:
+
+```sql
+alter table users add column if not exists pin text;
+alter table tasks add column if not exists due_date date;
+alter table tasks add column if not exists assignees jsonb default '[]'::jsonb;
+```
+
+(If you're creating the tables fresh, you can instead add `pin text` to `users`,
+`due_date date` and `assignees jsonb default '[]'::jsonb` to `tasks` above.)
+
+**Forgotten PIN?** PINs are set by each member on first login. If someone forgets
+theirs, clear it in Supabase (Table editor → `users` → set that row's `pin` to
+empty/null); they'll be prompted to set a new one next time.
+
 #### Step 3 — Paste your keys into the app
 1. In Supabase, go to **Project Settings → API**.
 2. Copy the **Project URL** and the **anon / public** key.
@@ -92,11 +109,21 @@ Each person picks their name on the login screen; that identity is remembered on
 their device.
 
 ## Features
+- **PIN login** — each member sets a 4-6 digit PIN on first sign-in; required after.
 - **Identity** — 9 preset members + add new members.
-- **Mission board** — add tasks, mark done / reopen, filter Ongoing / Completed / All.
+- **Mission board** — add tasks, mark done / reopen, filter Ongoing / Completed / All,
+  and **search** by title, person, or assignee.
+- **Due dates & assignees** — optional per task; overdue/soon badges and assignee
+  avatars on each card.
+- **Edit / delete tasks** — the creator (or admin) can edit a task's details or delete it.
 - **Task threads** — every update is logged with author + timestamp; a
-  "Log No Updates" option records an explicit no-update entry. Members can edit
-  their own updates in place (shown with an "edited" marker).
+  "Log No Updates" option records an explicit no-update entry. Members can edit or
+  delete their own updates ("edited" marker shown on edits).
+- **@mentions** — tag members in an update (chips below the box, or type `@`);
+  mentions are highlighted in the thread.
+- **Activity feed** — one chronological stream of every update across all tasks.
+- **Weekly summary** — per-person breakdown of the last 7 days, with a silent-this-week
+  flag for anyone with zero updates.
 - **Daily report** (Ponnam only) — scrapes the last **30 hours** of updates per
   ongoing task into a copyable text block. Tasks with no activity in the window
   show **No Response**; explicit no-update entries show **No Updates**.
