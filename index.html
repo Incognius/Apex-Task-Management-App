@@ -1,0 +1,1040 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Apex — Daily Submission Portal</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root {
+    --bg-0: #05030f;
+    --bg-1: #0b0820;
+    --bg-2: #120d2e;
+    --glass: rgba(22, 18, 48, 0.55);
+    --glass-brd: rgba(140, 120, 255, 0.18);
+    --ink: #e8e6ff;
+    --ink-dim: #a9a3d8;
+    --ink-faint: #6f699c;
+    --accent: #8b7bff;
+    --accent-2: #4ad6ff;
+    --accent-3: #ff7bd5;
+    --good: #45e0a8;
+    --warn: #ffcf6b;
+    --danger: #ff6b8b;
+    --radius: 16px;
+    --shadow: 0 18px 50px rgba(0, 0, 0, 0.55);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body { height: 100%; }
+
+  body {
+    font-family: "Segoe UI", "Inter", system-ui, -apple-system, sans-serif;
+    color: var(--ink);
+    background: radial-gradient(120% 120% at 80% -10%, #1a1140 0%, var(--bg-1) 40%, var(--bg-0) 100%);
+    min-height: 100vh;
+    overflow-x: hidden;
+    position: relative;
+  }
+
+  #starfield {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+  }
+
+  .nebula {
+    position: fixed;
+    border-radius: 50%;
+    filter: blur(90px);
+    opacity: 0.5;
+    z-index: 0;
+    pointer-events: none;
+    animation: drift 26s ease-in-out infinite alternate;
+  }
+  .nebula.a { width: 480px; height: 480px; background: radial-gradient(circle, #5b3bff, transparent 70%); top: -120px; left: -80px; }
+  .nebula.b { width: 520px; height: 520px; background: radial-gradient(circle, #1f7bff, transparent 70%); bottom: -160px; right: -100px; animation-delay: -8s; }
+  .nebula.c { width: 360px; height: 360px; background: radial-gradient(circle, #ff3ba6, transparent 70%); top: 40%; left: 55%; opacity: 0.28; animation-delay: -14s; }
+
+  @keyframes drift {
+    0%   { transform: translate(0, 0) scale(1); }
+    100% { transform: translate(40px, 30px) scale(1.12); }
+  }
+
+  .app {
+    position: relative;
+    z-index: 2;
+    max-width: 1040px;
+    margin: 0 auto;
+    padding: 28px 22px 80px;
+  }
+
+  /* ---------- Top bar ---------- */
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 30px;
+    flex-wrap: wrap;
+  }
+  .brand { display: flex; align-items: center; gap: 14px; }
+  .brand .mark {
+    width: 44px; height: 44px; border-radius: 13px;
+    background: conic-gradient(from 140deg, var(--accent), var(--accent-2), var(--accent-3), var(--accent));
+    box-shadow: 0 0 26px rgba(139, 123, 255, 0.6), inset 0 0 12px rgba(255,255,255,0.25);
+    position: relative;
+  }
+  .brand .mark::after {
+    content: ""; position: absolute; inset: 9px; border-radius: 7px;
+    background: var(--bg-0);
+  }
+  .brand .mark::before {
+    content: ""; position: absolute; inset: 16px; border-radius: 50%;
+    background: radial-gradient(circle, #fff, var(--accent-2));
+    box-shadow: 0 0 14px var(--accent-2);
+    z-index: 1;
+  }
+  .brand h1 { font-size: 22px; letter-spacing: 4px; font-weight: 600; }
+  .brand span { display: block; font-size: 11px; letter-spacing: 3px; color: var(--ink-faint); text-transform: uppercase; }
+
+  .session { display: flex; align-items: center; gap: 12px; }
+  .who {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--glass); border: 1px solid var(--glass-brd);
+    padding: 7px 14px; border-radius: 30px; backdrop-filter: blur(12px);
+  }
+  .who .avatar { width: 26px; height: 26px; }
+  .who b { font-weight: 600; font-size: 14px; }
+  .who small { color: var(--ink-faint); font-size: 11px; letter-spacing: 1px; }
+
+  .avatar {
+    border-radius: 50%;
+    display: inline-grid; place-items: center;
+    font-weight: 700; color: #0a0720;
+    box-shadow: 0 0 14px rgba(139,123,255,0.45);
+    flex: none;
+  }
+
+  /* ---------- Buttons ---------- */
+  button { font-family: inherit; cursor: pointer; }
+  .btn {
+    border: 1px solid var(--glass-brd);
+    background: rgba(139, 123, 255, 0.12);
+    color: var(--ink);
+    padding: 10px 18px; border-radius: 11px;
+    font-size: 14px; font-weight: 500; letter-spacing: 0.4px;
+    transition: all 0.18s ease;
+    backdrop-filter: blur(8px);
+  }
+  .btn:hover { background: rgba(139, 123, 255, 0.26); transform: translateY(-1px); box-shadow: 0 8px 22px rgba(91, 59, 255, 0.3); }
+  .btn.primary {
+    background: linear-gradient(120deg, var(--accent), var(--accent-2));
+    color: #07061a; font-weight: 600; border: none;
+  }
+  .btn.primary:hover { box-shadow: 0 10px 28px rgba(74, 214, 255, 0.4); }
+  .btn.ghost { background: transparent; }
+  .btn.small { padding: 7px 12px; font-size: 12.5px; }
+  .btn.danger { color: var(--danger); border-color: rgba(255,107,139,0.35); background: rgba(255,107,139,0.08); }
+  .btn.danger:hover { background: rgba(255,107,139,0.2); box-shadow: none; }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; box-shadow: none; }
+
+  /* ---------- Login ---------- */
+  .hero { text-align: center; margin: 26px 0 34px; }
+  .hero h2 { font-size: 30px; font-weight: 600; letter-spacing: 1px; margin-bottom: 10px; }
+  .hero h2 .grad {
+    background: linear-gradient(100deg, var(--accent-2), var(--accent), var(--accent-3));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .hero p { color: var(--ink-dim); font-size: 15px; }
+
+  .people-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 16px;
+  }
+  .person-card {
+    background: var(--glass);
+    border: 1px solid var(--glass-brd);
+    border-radius: var(--radius);
+    padding: 22px 16px;
+    text-align: center;
+    transition: all 0.2s ease;
+    backdrop-filter: blur(12px);
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+  }
+  .person-card::before {
+    content: ""; position: absolute; inset: 0;
+    background: radial-gradient(circle at 50% 0%, rgba(139,123,255,0.22), transparent 70%);
+    opacity: 0; transition: opacity 0.2s;
+  }
+  .person-card:hover { transform: translateY(-4px); border-color: var(--accent); box-shadow: 0 16px 40px rgba(91,59,255,0.3); }
+  .person-card:hover::before { opacity: 1; }
+  .person-card .avatar { width: 56px; height: 56px; font-size: 22px; margin: 0 auto 12px; }
+  .person-card .name { font-size: 15px; font-weight: 600; position: relative; }
+  .person-card.add { display: grid; place-content: center; border-style: dashed; color: var(--ink-dim); min-height: 130px; }
+  .person-card.add .plus { font-size: 30px; font-weight: 300; line-height: 1; margin-bottom: 6px; }
+
+  /* ---------- Tasks ---------- */
+  .section-head {
+    display: flex; align-items: center; justify-content: space-between;
+    margin: 8px 0 18px; gap: 14px; flex-wrap: wrap;
+  }
+  .section-head h3 { font-size: 19px; font-weight: 600; letter-spacing: 0.5px; }
+  .section-head .sub { color: var(--ink-faint); font-size: 13px; margin-top: 3px; }
+  .head-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+
+  .filter-tabs { display: flex; gap: 6px; background: var(--glass); border: 1px solid var(--glass-brd); padding: 5px; border-radius: 12px; }
+  .filter-tabs button {
+    border: none; background: transparent; color: var(--ink-dim);
+    padding: 7px 16px; border-radius: 8px; font-size: 13px; font-weight: 500;
+    transition: all 0.15s;
+  }
+  .filter-tabs button.active { background: rgba(139,123,255,0.28); color: var(--ink); }
+
+  .task-list { display: flex; flex-direction: column; gap: 13px; }
+  .task-card {
+    background: var(--glass);
+    border: 1px solid var(--glass-brd);
+    border-radius: var(--radius);
+    padding: 18px 20px;
+    display: flex; align-items: center; gap: 16px;
+    transition: all 0.18s ease;
+    backdrop-filter: blur(12px);
+    position: relative;
+  }
+  .task-card:hover { border-color: rgba(139,123,255,0.45); transform: translateX(3px); }
+  .task-card .status-dot {
+    width: 11px; height: 11px; border-radius: 50%; flex: none;
+    background: var(--good); box-shadow: 0 0 12px var(--good);
+  }
+  .task-card.done .status-dot { background: var(--ink-faint); box-shadow: none; }
+  .task-main { flex: 1; min-width: 0; cursor: pointer; }
+  .task-main .title { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+  .task-card.done .task-main .title { text-decoration: line-through; color: var(--ink-dim); }
+  .task-main .meta { font-size: 12px; color: var(--ink-faint); display: flex; gap: 14px; flex-wrap: wrap; }
+  .task-main .meta .recent { color: var(--accent-2); }
+  .task-actions { display: flex; gap: 8px; flex: none; }
+
+  .empty {
+    text-align: center; padding: 60px 20px; color: var(--ink-faint);
+    border: 1px dashed var(--glass-brd); border-radius: var(--radius);
+    background: rgba(255,255,255,0.012);
+  }
+  .empty .big { font-size: 16px; color: var(--ink-dim); margin-bottom: 6px; }
+
+  /* ---------- Detail ---------- */
+  .back-link {
+    display: inline-flex; align-items: center; gap: 8px;
+    color: var(--ink-dim); background: none; border: none; font-size: 14px;
+    margin-bottom: 18px; padding: 0;
+  }
+  .back-link:hover { color: var(--ink); }
+
+  .detail-head {
+    background: var(--glass); border: 1px solid var(--glass-brd);
+    border-radius: var(--radius); padding: 24px; margin-bottom: 24px; backdrop-filter: blur(12px);
+  }
+  .detail-head .badge {
+    display: inline-block; font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase;
+    padding: 4px 12px; border-radius: 20px; margin-bottom: 12px;
+    background: rgba(69,224,168,0.14); color: var(--good); border: 1px solid rgba(69,224,168,0.3);
+  }
+  .detail-head .badge.done { background: rgba(111,105,156,0.16); color: var(--ink-dim); border-color: rgba(111,105,156,0.3); }
+  .detail-head h2 { font-size: 24px; font-weight: 600; margin-bottom: 8px; }
+  .detail-head .desc { color: var(--ink-dim); font-size: 14.5px; line-height: 1.55; margin-bottom: 14px; white-space: pre-wrap; }
+  .detail-head .meta { font-size: 12.5px; color: var(--ink-faint); }
+
+  .compose {
+    background: var(--glass); border: 1px solid var(--glass-brd);
+    border-radius: var(--radius); padding: 18px; margin-bottom: 24px; backdrop-filter: blur(12px);
+  }
+  .compose textarea {
+    width: 100%; min-height: 84px; resize: vertical;
+    background: rgba(8,5,22,0.6); border: 1px solid var(--glass-brd);
+    border-radius: 11px; color: var(--ink); padding: 13px 15px;
+    font-family: inherit; font-size: 14.5px; line-height: 1.5;
+    transition: border 0.15s;
+  }
+  .compose textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(139,123,255,0.15); }
+  .compose .row { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; gap: 12px; flex-wrap: wrap; }
+  .compose .as { font-size: 13px; color: var(--ink-faint); display: flex; align-items: center; gap: 8px; }
+
+  .timeline { display: flex; flex-direction: column; gap: 14px; }
+  .timeline h4 { font-size: 14px; color: var(--ink-dim); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 2px; }
+  .update {
+    background: var(--glass); border: 1px solid var(--glass-brd);
+    border-radius: 14px; padding: 15px 17px; backdrop-filter: blur(10px);
+    position: relative;
+  }
+  .update.noupdate { border-style: dashed; opacity: 0.85; }
+  .update .head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .update .head .avatar { width: 30px; height: 30px; font-size: 13px; }
+  .update .head .who-name { font-weight: 600; font-size: 14px; }
+  .update .head .time { font-size: 12px; color: var(--ink-faint); margin-left: auto; }
+  .update .body { font-size: 14.5px; line-height: 1.55; color: var(--ink); white-space: pre-wrap; padding-left: 40px; }
+  .update.noupdate .body { color: var(--ink-faint); font-style: italic; }
+  .update .tag {
+    font-size: 10.5px; letter-spacing: 1px; text-transform: uppercase;
+    padding: 2px 8px; border-radius: 10px; margin-left: 8px;
+    background: rgba(255,207,107,0.14); color: var(--warn);
+  }
+  .update .edit-btn { margin-left: 10px; padding: 3px 10px; font-size: 11.5px; opacity: 0.6; }
+  .update .edit-btn:hover { opacity: 1; }
+  .update .edit-area { padding-left: 40px; }
+  .update .edit-area textarea {
+    width: 100%; min-height: 70px; resize: vertical;
+    background: rgba(8,5,22,0.6); border: 1px solid var(--glass-brd);
+    border-radius: 10px; color: var(--ink); padding: 11px 13px;
+    font-family: inherit; font-size: 14.5px; line-height: 1.5;
+  }
+  .update .edit-area textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(139,123,255,0.15); }
+  .update .edit-row { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
+  @media (max-width: 560px) { .update .edit-area { padding-left: 0; } }
+
+  /* ---------- Modal ---------- */
+  .overlay {
+    position: fixed; inset: 0; z-index: 50;
+    background: rgba(3, 2, 12, 0.72); backdrop-filter: blur(6px);
+    display: none; align-items: center; justify-content: center; padding: 22px;
+  }
+  .overlay.show { display: flex; }
+  .modal {
+    background: linear-gradient(160deg, var(--bg-2), var(--bg-1));
+    border: 1px solid var(--glass-brd);
+    border-radius: 20px; padding: 26px; width: 100%; max-width: 540px;
+    box-shadow: var(--shadow); position: relative;
+    max-height: 88vh; overflow-y: auto;
+  }
+  .modal h3 { font-size: 20px; font-weight: 600; margin-bottom: 6px; }
+  .modal .modal-sub { color: var(--ink-faint); font-size: 13px; margin-bottom: 20px; }
+  .field { margin-bottom: 16px; }
+  .field label { display: block; font-size: 12.5px; color: var(--ink-dim); margin-bottom: 7px; letter-spacing: 0.5px; }
+  .field input, .field textarea {
+    width: 100%; background: rgba(8,5,22,0.6); border: 1px solid var(--glass-brd);
+    border-radius: 11px; color: var(--ink); padding: 12px 14px;
+    font-family: inherit; font-size: 14.5px;
+  }
+  .field textarea { min-height: 80px; resize: vertical; line-height: 1.5; }
+  .field input:focus, .field textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(139,123,255,0.15); }
+  .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 8px; }
+  .modal .close { position: absolute; top: 18px; right: 18px; background: none; border: none; color: var(--ink-faint); font-size: 22px; line-height: 1; }
+  .modal .close:hover { color: var(--ink); }
+
+  /* Report */
+  .report-box {
+    background: #07051a; border: 1px solid var(--glass-brd); border-radius: 12px;
+    padding: 18px; font-family: "Cascadia Code", "Consolas", monospace; font-size: 13px;
+    line-height: 1.7; color: var(--ink); white-space: pre-wrap; max-height: 46vh; overflow-y: auto;
+    margin-bottom: 16px;
+  }
+
+  .toast {
+    position: fixed; bottom: 26px; left: 50%; transform: translateX(-50%) translateY(20px);
+    background: linear-gradient(120deg, var(--accent), var(--accent-2)); color: #07061a;
+    padding: 13px 24px; border-radius: 12px; font-weight: 600; font-size: 14px;
+    box-shadow: 0 12px 34px rgba(74,214,255,0.4); z-index: 100;
+    opacity: 0; transition: all 0.3s ease; pointer-events: none;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  .hidden { display: none !important; }
+
+  .mode-banner {
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    background: rgba(255,207,107,0.08); border: 1px solid rgba(255,207,107,0.25);
+    color: var(--warn); border-radius: 12px; padding: 11px 16px; margin-bottom: 22px;
+    font-size: 13px; backdrop-filter: blur(8px);
+  }
+  .mode-banner b { color: #ffe0a0; }
+  .mode-banner .spacer { flex: 1; }
+  .mode-banner button { background: none; border: none; color: var(--warn); font-size: 18px; line-height: 1; cursor: pointer; }
+  .live-pill {
+    display: inline-flex; align-items: center; gap: 7px;
+    font-size: 11px; letter-spacing: 1px; color: var(--good);
+    background: rgba(69,224,168,0.1); border: 1px solid rgba(69,224,168,0.28);
+    padding: 5px 12px; border-radius: 20px;
+  }
+  .live-pill .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--good); box-shadow: 0 0 8px var(--good); animation: pulse 1.8s infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+  @media (max-width: 560px) {
+    .task-card { flex-wrap: wrap; }
+    .task-actions { width: 100%; justify-content: flex-end; }
+    .update .body { padding-left: 0; }
+  }
+</style>
+</head>
+<body>
+  <canvas id="starfield"></canvas>
+  <div class="nebula a"></div>
+  <div class="nebula b"></div>
+  <div class="nebula c"></div>
+
+  <div class="app">
+    <!-- Top bar -->
+    <div class="topbar">
+      <div class="brand">
+        <div class="mark"></div>
+        <div>
+          <h1>APEX</h1>
+          <span>Daily Submission Portal</span>
+        </div>
+      </div>
+      <div class="session" id="session"></div>
+    </div>
+
+    <div class="mode-banner hidden" id="mode-banner">
+      <span><b>Local mode</b> — data is saved only on this device. To share across everyone, add your Supabase keys near the top of <b>index.html</b> (see README).</span>
+      <span class="spacer"></span>
+      <button id="banner-dismiss" title="Dismiss">&times;</button>
+    </div>
+
+    <!-- LOGIN -->
+    <section id="screen-login">
+      <div class="hero">
+        <h2>Identify <span class="grad">yourself</span></h2>
+        <p>Select your profile to enter the portal</p>
+      </div>
+      <div class="people-grid" id="people-grid"></div>
+    </section>
+
+    <!-- TASKS -->
+    <section id="screen-tasks" class="hidden">
+      <div class="section-head">
+        <div>
+          <h3>Mission Board</h3>
+          <div class="sub" id="tasks-sub"></div>
+        </div>
+        <div class="head-actions">
+          <div class="filter-tabs" id="filter-tabs">
+            <button data-filter="ongoing" class="active">Ongoing</button>
+            <button data-filter="done">Completed</button>
+            <button data-filter="all">All</button>
+          </div>
+          <button class="btn" id="btn-report">Generate Report</button>
+          <button class="btn primary" id="btn-add-task">New Task</button>
+        </div>
+      </div>
+      <div class="task-list" id="task-list"></div>
+    </section>
+
+    <!-- DETAIL -->
+    <section id="screen-detail" class="hidden">
+      <button class="back-link" id="btn-back">&larr; Back to board</button>
+      <div class="detail-head" id="detail-head"></div>
+      <div class="compose">
+        <textarea id="update-text" placeholder="Write your update for this task..."></textarea>
+        <div class="row">
+          <div class="as" id="compose-as"></div>
+          <div style="display:flex; gap:10px;">
+            <button class="btn" id="btn-noupdate">Log "No Updates"</button>
+            <button class="btn primary" id="btn-post">Post Update</button>
+          </div>
+        </div>
+      </div>
+      <div class="timeline">
+        <h4>Activity Log</h4>
+        <div id="timeline-list"></div>
+      </div>
+    </section>
+  </div>
+
+  <!-- Add user modal -->
+  <div class="overlay" id="modal-user">
+    <div class="modal">
+      <button class="close" data-close>&times;</button>
+      <h3>Add a member</h3>
+      <div class="modal-sub">Register a new person to the portal.</div>
+      <div class="field">
+        <label>Name</label>
+        <input type="text" id="new-user-name" placeholder="e.g. Aarav" maxlength="24" autocomplete="off">
+      </div>
+      <div class="modal-actions">
+        <button class="btn ghost" data-close>Cancel</button>
+        <button class="btn primary" id="save-user">Add Member</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add task modal -->
+  <div class="overlay" id="modal-task">
+    <div class="modal">
+      <button class="close" data-close>&times;</button>
+      <h3>New Task</h3>
+      <div class="modal-sub">Add an ongoing task to the mission board.</div>
+      <div class="field">
+        <label>Task title</label>
+        <input type="text" id="new-task-title" placeholder="e.g. Backend API integration" maxlength="80" autocomplete="off">
+      </div>
+      <div class="field">
+        <label>Description (optional)</label>
+        <textarea id="new-task-desc" placeholder="Context, goals, scope..."></textarea>
+      </div>
+      <div class="modal-actions">
+        <button class="btn ghost" data-close>Cancel</button>
+        <button class="btn primary" id="save-task">Create Task</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Report modal -->
+  <div class="overlay" id="modal-report">
+    <div class="modal" style="max-width: 640px;">
+      <button class="close" data-close>&times;</button>
+      <h3>Daily Report</h3>
+      <div class="modal-sub" id="report-window">Updates from the last 30 hours, across all ongoing tasks.</div>
+      <div class="report-box" id="report-box"></div>
+      <div class="modal-actions">
+        <button class="btn ghost" data-close>Close</button>
+        <button class="btn primary" id="btn-copy-report">Copy to Clipboard</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+<script>
+(function () {
+  "use strict";
+
+  // ============================================================
+  //  SUPABASE CONFIG  —  paste your project values here to go
+  //  shared across everyone. Leave blank to run in local mode.
+  //  Get these from Supabase > Project Settings > API.
+  // ============================================================
+  var SUPABASE_URL = "https://unfnxnyrfamdpgnakdxy.supabase.co";        // e.g. "https://abcd1234.supabase.co"
+  var SUPABASE_ANON_KEY = "sb_publishable_3vAQ2zDwsQIyEPUJD0lT8g_Ro-BinUT";   // the "anon / public" key
+  // ============================================================
+
+  // ---------- Config ----------
+  var ADMIN = "Ponnam";
+  var REPORT_WINDOW_HOURS = 30;
+  var POLL_MS = 12000;
+  var DEFAULT_USERS = ["Chervith","Inesh","Kimaya","Kavya","Samarth","Udhav","Ujjwal","Ponnam","Hemang"];
+  var AVATAR_COLORS = [
+    ["#8b7bff","#4ad6ff"],["#4ad6ff","#45e0a8"],["#ff7bd5","#8b7bff"],
+    ["#ffcf6b","#ff7bd5"],["#45e0a8","#4ad6ff"],["#ff6b8b","#ffcf6b"],
+    ["#7b9dff","#b07bff"],["#4ad6ff","#7bffd5"],["#ff9b6b","#ff6b8b"]
+  ];
+
+  var useCloud = !!(SUPABASE_URL && SUPABASE_ANON_KEY && window.supabase);
+  var sb = useCloud ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+
+  // ---------- State ----------
+  var state = {
+    users: useCloud ? [] : load("apex_users", DEFAULT_USERS.slice()),
+    tasks: useCloud ? [] : load("apex_tasks", []),
+    updates: useCloud ? [] : load("apex_updates", []),
+    currentUser: load("apex_currentUser", null)   // identity is always per-device
+  };
+  var filter = "ongoing";
+  var activeTaskId = null;
+  var editingId = null;   // id of the update currently being edited (pauses auto-refresh)
+
+  function load(key, fallback) {
+    try { var v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; }
+    catch (e) { return fallback; }
+  }
+  function saveLocal() {
+    localStorage.setItem("apex_users", JSON.stringify(state.users));
+    localStorage.setItem("apex_tasks", JSON.stringify(state.tasks));
+    localStorage.setItem("apex_updates", JSON.stringify(state.updates));
+  }
+  function saveUser() { localStorage.setItem("apex_currentUser", JSON.stringify(state.currentUser)); }
+  function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+
+  // ---------- Data layer (cloud or local) ----------
+  function ms(iso) { return new Date(iso).getTime(); }
+
+  // Pull everything from the cloud into the in-memory state.
+  function refresh() {
+    if (!useCloud) return Promise.resolve();
+    return Promise.all([
+      sb.from("users").select("name").order("created_at", { ascending: true }),
+      sb.from("tasks").select("*").order("created_at", { ascending: true }),
+      sb.from("updates").select("*").order("created_at", { ascending: true })
+    ]).then(function (res) {
+      if (res[0].data) state.users = res[0].data.map(function (r) { return r.name; });
+      if (res[1].data) state.tasks = res[1].data.map(function (r) {
+        return { id: r.id, title: r.title, desc: r.descr || "", status: r.status,
+                 createdBy: r.created_by, createdAt: ms(r.created_at) };
+      });
+      if (res[2].data) state.updates = res[2].data.map(function (r) {
+        return { id: r.id, taskId: r.task_id, author: r.author, type: r.type,
+                 text: r.body || "", ts: ms(r.created_at),
+                 edited: r.edited_at ? ms(r.edited_at) : null };
+      });
+    }).catch(function (e) { console.error("refresh failed", e); });
+  }
+
+  // Seed default members the first time the cloud DB is empty.
+  function seedUsers() {
+    if (!useCloud || state.users.length) return Promise.resolve();
+    return sb.from("users").insert(DEFAULT_USERS.map(function (n) { return { name: n }; }))
+      .then(refresh).catch(function () {});
+  }
+
+  function addUserRemote(name) {
+    if (useCloud) return sb.from("users").insert({ name: name }).then(refresh);
+    state.users.push(name); saveLocal(); return Promise.resolve();
+  }
+  function addTaskRemote(title, desc) {
+    if (useCloud) {
+      return sb.from("tasks").insert({ title: title, descr: desc, status: "ongoing",
+        created_by: state.currentUser }).then(refresh);
+    }
+    state.tasks.push({ id: uid(), title: title, desc: desc, status: "ongoing",
+      createdBy: state.currentUser, createdAt: Date.now() });
+    saveLocal(); return Promise.resolve();
+  }
+  function setStatusRemote(id, status) {
+    if (useCloud) return sb.from("tasks").update({ status: status }).eq("id", id).then(refresh);
+    var t = state.tasks.filter(function (x) { return x.id === id; })[0];
+    if (t) { t.status = status; saveLocal(); }
+    return Promise.resolve();
+  }
+  function addUpdateRemote(taskId, type, text) {
+    if (useCloud) {
+      return sb.from("updates").insert({ task_id: taskId, author: state.currentUser,
+        type: type, body: text }).then(refresh);
+    }
+    state.updates.push({ id: uid(), taskId: taskId, author: state.currentUser,
+      type: type, text: text, ts: Date.now() });
+    saveLocal(); return Promise.resolve();
+  }
+  function editUpdateRemote(id, text) {
+    if (useCloud) {
+      // Try recording an edit timestamp; fall back if the column doesn't exist.
+      return sb.from("updates").update({ body: text, edited_at: new Date().toISOString() })
+        .eq("id", id).then(function (res) {
+          if (res.error) return sb.from("updates").update({ body: text }).eq("id", id);
+        }).then(refresh);
+    }
+    var u = state.updates.filter(function (x) { return x.id === id; })[0];
+    if (u) { u.text = text; u.edited = Date.now(); saveLocal(); }
+    return Promise.resolve();
+  }
+
+  // ---------- Helpers ----------
+  function $(id) { return document.getElementById(id); }
+  function el(tag, cls, html) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (html != null) e.innerHTML = html;
+    return e;
+  }
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;" }[c];
+    });
+  }
+  function initials(name) {
+    var p = name.trim().split(/\s+/);
+    return (p.length > 1 ? p[0][0] + p[1][0] : name.slice(0, 2)).toUpperCase();
+  }
+  function colorFor(name) {
+    var h = 0; for (var i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) % AVATAR_COLORS.length;
+    return AVATAR_COLORS[h];
+  }
+  function avatar(name, size) {
+    var c = colorFor(name);
+    var a = el("span", "avatar", initials(name));
+    a.style.background = "linear-gradient(135deg," + c[0] + "," + c[1] + ")";
+    if (size) { a.style.width = a.style.height = size + "px"; a.style.fontSize = (size * 0.4) + "px"; }
+    return a;
+  }
+  function fmtTime(ts) {
+    var d = new Date(ts);
+    var h = d.getHours(), m = d.getMinutes();
+    var ap = h >= 12 ? "PM" : "AM"; var hh = h % 12; if (hh === 0) hh = 12;
+    return hh + ":" + (m < 10 ? "0" + m : m) + " " + ap;
+  }
+  function fmtDateTime(ts) {
+    var d = new Date(ts);
+    var today = new Date(); var y = new Date(); y.setDate(y.getDate() - 1);
+    var sameDay = function (a, b) { return a.toDateString() === b.toDateString(); };
+    var day = sameDay(d, today) ? "Today" : sameDay(d, y) ? "Yesterday"
+      : d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+    return day + " at " + fmtTime(ts);
+  }
+  function clock24(ts) {
+    var d = new Date(ts);
+    var h = d.getHours(), m = d.getMinutes();
+    return (h < 10 ? "0" + h : h) + ":" + (m < 10 ? "0" + m : m);
+  }
+  function toast(msg) {
+    var t = $("toast"); t.textContent = msg; t.classList.add("show");
+    clearTimeout(toast._t); toast._t = setTimeout(function () { t.classList.remove("show"); }, 2200);
+  }
+
+  function updatesFor(taskId) {
+    return state.updates.filter(function (u) { return u.taskId === taskId; })
+      .sort(function (a, b) { return a.ts - b.ts; });
+  }
+  function lastActivity(taskId) {
+    var us = updatesFor(taskId);
+    return us.length ? us[us.length - 1].ts : null;
+  }
+
+  // ---------- Render: session bar ----------
+  function renderSession() {
+    var s = $("session"); s.innerHTML = "";
+    if (!state.currentUser) return;
+    if (useCloud) {
+      var pill = el("span", "live-pill");
+      pill.innerHTML = '<span class="dot"></span>LIVE • SHARED';
+      s.appendChild(pill);
+    }
+    var who = el("div", "who");
+    who.appendChild(avatar(state.currentUser, 26));
+    var box = el("div");
+    box.appendChild(el("b", null, esc(state.currentUser)));
+    box.appendChild(el("small", null, state.currentUser === ADMIN ? "ADMIN" : "MEMBER"));
+    box.style.lineHeight = "1.2";
+    who.appendChild(box);
+    s.appendChild(who);
+    var sw = el("button", "btn small ghost", "Switch");
+    sw.onclick = function () { state.currentUser = null; saveUser(); route(); };
+    s.appendChild(sw);
+  }
+
+  // ---------- Render: login ----------
+  function renderLogin() {
+    var g = $("people-grid"); g.innerHTML = "";
+    state.users.forEach(function (name) {
+      var card = el("div", "person-card");
+      card.appendChild(avatar(name, 56));
+      card.appendChild(el("div", "name", esc(name)));
+      card.onclick = function () { state.currentUser = name; saveUser(); route(); toast("Welcome, " + name); };
+      g.appendChild(card);
+    });
+    var add = el("div", "person-card add");
+    add.innerHTML = '<div class="plus">+</div><div class="name">Add member</div>';
+    add.onclick = function () { openModal("modal-user"); setTimeout(function(){ $("new-user-name").focus(); }, 50); };
+    g.appendChild(add);
+  }
+
+  // ---------- Render: tasks ----------
+  function renderTasks() {
+    var ongoing = state.tasks.filter(function (t) { return t.status === "ongoing"; });
+    $("tasks-sub").textContent = ongoing.length + " ongoing • " +
+      state.tasks.filter(function (t) { return t.status === "done"; }).length + " completed";
+
+    $("btn-report").classList.toggle("hidden", state.currentUser !== ADMIN);
+
+    var list = $("task-list"); list.innerHTML = "";
+    var shown = state.tasks.filter(function (t) {
+      return filter === "all" ? true : t.status === filter;
+    }).sort(function (a, b) { return a.createdAt - b.createdAt; });
+
+    if (!shown.length) {
+      var e = el("div", "empty");
+      e.innerHTML = '<div class="big">No ' + (filter === "all" ? "" : filter + " ") +
+        'tasks yet</div><div>Create a task to start tracking daily updates.</div>';
+      list.appendChild(e);
+      return;
+    }
+
+    shown.forEach(function (t) {
+      var card = el("div", "task-card" + (t.status === "done" ? " done" : ""));
+      card.appendChild(el("div", "status-dot"));
+
+      var main = el("div", "task-main");
+      main.appendChild(el("div", "title", esc(t.title)));
+      var la = lastActivity(t.id);
+      var count = updatesFor(t.id).length;
+      var meta = el("div", "meta");
+      meta.innerHTML = "<span>by " + esc(t.createdBy) + "</span>" +
+        "<span>" + count + " update" + (count === 1 ? "" : "s") + "</span>" +
+        (la ? '<span class="recent">last activity ' + fmtDateTime(la) + "</span>"
+            : '<span>no activity yet</span>');
+      main.appendChild(meta);
+      main.onclick = function () { openTask(t.id); };
+      card.appendChild(main);
+
+      var actions = el("div", "task-actions");
+      var open = el("button", "btn small", "Open");
+      open.onclick = function () { openTask(t.id); };
+      actions.appendChild(open);
+
+      if (t.status === "ongoing") {
+        var done = el("button", "btn small", "Mark Done");
+        done.onclick = function () { setStatus(t.id, "done"); toast("Task completed"); };
+        actions.appendChild(done);
+      } else {
+        var re = el("button", "btn small", "Reopen");
+        re.onclick = function () { setStatus(t.id, "ongoing"); toast("Task reopened"); };
+        actions.appendChild(re);
+      }
+      card.appendChild(actions);
+      list.appendChild(card);
+    });
+  }
+
+  function setStatus(id, status) {
+    setStatusRemote(id, status).then(function () {
+      renderTasks(); if (activeTaskId === id) renderDetail();
+    });
+  }
+
+  // ---------- Render: detail ----------
+  function openTask(id) { activeTaskId = id; show("screen-detail"); renderDetail(); window.scrollTo(0, 0); }
+
+  function renderDetail() {
+    var t = state.tasks.filter(function (x) { return x.id === activeTaskId; })[0];
+    if (!t) { show("screen-tasks"); return; }
+
+    var h = $("detail-head"); h.innerHTML = "";
+    var badge = el("span", "badge" + (t.status === "done" ? " done" : ""),
+      t.status === "done" ? "Completed" : "Ongoing");
+    h.appendChild(badge);
+    h.appendChild(el("h2", null, esc(t.title)));
+    if (t.desc) h.appendChild(el("div", "desc", esc(t.desc)));
+    h.appendChild(el("div", "meta", "Created by " + esc(t.createdBy) + " • " + fmtDateTime(t.createdAt)));
+
+    var ca = $("compose-as"); ca.innerHTML = "Posting as ";
+    ca.appendChild(avatar(state.currentUser, 22));
+    ca.appendChild(document.createTextNode(" " + state.currentUser));
+
+    var tl = $("timeline-list"); tl.innerHTML = "";
+    var us = updatesFor(activeTaskId);
+    if (!us.length) {
+      tl.appendChild(el("div", "empty", '<div class="big">No updates yet</div><div>Be the first to post an update on this task.</div>'));
+      return;
+    }
+    us.slice().reverse().forEach(function (u) {
+      var up = el("div", "update" + (u.type === "noupdate" ? " noupdate" : ""));
+      var head = el("div", "head");
+      head.appendChild(avatar(u.author, 30));
+      var nm = el("span", "who-name", esc(u.author));
+      head.appendChild(nm);
+      if (u.type === "noupdate") head.appendChild(el("span", "tag", "No Updates"));
+      head.appendChild(el("span", "time", fmtDateTime(u.ts) + (u.edited ? " • edited" : "")));
+      // Only the author can edit their own text update.
+      if (u.type !== "noupdate" && u.author === state.currentUser) {
+        var editBtn = el("button", "btn small ghost edit-btn", "Edit");
+        editBtn.onclick = function () { startEdit(up, u); };
+        head.appendChild(editBtn);
+      }
+      up.appendChild(head);
+      var body = el("div", "body", u.type === "noupdate" ? "Logged no updates for this task." : esc(u.text));
+      up.appendChild(body);
+      tl.appendChild(up);
+    });
+  }
+
+  // Swap an update's body for an inline editor.
+  function startEdit(card, u) {
+    var body = card.querySelector(".body");
+    var editor = el("div", "edit-area");
+    var ta = el("textarea");
+    ta.value = u.text;
+    var row = el("div", "edit-row");
+    var saveB = el("button", "btn small primary", "Save");
+    var cancelB = el("button", "btn small ghost", "Cancel");
+    row.appendChild(cancelB); row.appendChild(saveB);
+    editor.appendChild(ta); editor.appendChild(row);
+    body.replaceWith(editor);
+    editingId = u.id;   // pause auto-refresh while editing
+    ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length);
+
+    cancelB.onclick = function () { editingId = null; renderDetail(); };
+    saveB.onclick = function () {
+      var text = ta.value.trim();
+      if (!text) { toast("Update can't be empty"); ta.focus(); return; }
+      saveB.disabled = cancelB.disabled = true;
+      editUpdateRemote(u.id, text).then(function () { editingId = null; renderDetail(); toast("Update edited"); });
+    };
+  }
+
+  function postUpdate(type) {
+    var t = state.tasks.filter(function (x) { return x.id === activeTaskId; })[0];
+    if (!t) return;
+    var text = $("update-text").value.trim();
+    if (type === "update" && !text) { toast("Write something first"); $("update-text").focus(); return; }
+    var btnP = $("btn-post"), btnN = $("btn-noupdate");
+    btnP.disabled = btnN.disabled = true;
+    addUpdateRemote(activeTaskId, type, type === "update" ? text : "").then(function () {
+      $("update-text").value = "";
+      btnP.disabled = btnN.disabled = false;
+      renderDetail();
+      toast(type === "noupdate" ? "Logged: No Updates" : "Update posted");
+    });
+  }
+
+  // ---------- Report ----------
+  function buildReport() {
+    var cutoff = Date.now() - REPORT_WINDOW_HOURS * 3600 * 1000;
+    var ongoing = state.tasks.filter(function (t) { return t.status === "ongoing"; })
+      .sort(function (a, b) { return a.createdAt - b.createdAt; });
+
+    var lines = ["Daily Updates!", ""];
+    if (!ongoing.length) { lines.push("No ongoing tasks."); return lines.join("\n"); }
+
+    ongoing.forEach(function (t) {
+      lines.push(t.title + ":");
+      var recent = state.updates.filter(function (u) {
+        return u.taskId === t.id && u.ts >= cutoff;
+      }).sort(function (a, b) { return a.ts - b.ts; });
+
+      if (!recent.length) {
+        lines.push("No Response");
+      } else {
+        recent.forEach(function (u) {
+          var body = u.type === "noupdate" ? "No Updates" : u.text;
+          lines.push(u.author + ": " + body + " @ " + clock24(u.ts));
+        });
+      }
+      lines.push("");
+    });
+    return lines.join("\n").replace(/\n+$/, "\n");
+  }
+
+  function openReport() {
+    if (state.currentUser !== ADMIN) { toast("Only " + ADMIN + " can generate reports"); return; }
+    $("report-window").textContent = "Updates from the last " + REPORT_WINDOW_HOURS +
+      " hours • " + new Date().toLocaleString();
+    $("report-box").textContent = buildReport();
+    openModal("modal-report");
+  }
+
+  // ---------- Routing ----------
+  function show(screen) {
+    ["screen-login", "screen-tasks", "screen-detail"].forEach(function (s) {
+      $(s).classList.toggle("hidden", s !== screen);
+    });
+  }
+  function route() {
+    renderSession();
+    if (!state.currentUser) { show("screen-login"); renderLogin(); }
+    else { show("screen-tasks"); renderTasks(); }
+  }
+
+  // ---------- Modals ----------
+  function openModal(id) { $(id).classList.add("show"); }
+  function closeModal(id) { $(id).classList.remove("show"); }
+  document.querySelectorAll("[data-close]").forEach(function (b) {
+    b.addEventListener("click", function () {
+      var ov = b.closest(".overlay"); if (ov) ov.classList.remove("show");
+    });
+  });
+  document.querySelectorAll(".overlay").forEach(function (ov) {
+    ov.addEventListener("click", function (e) { if (e.target === ov) ov.classList.remove("show"); });
+  });
+
+  // ---------- Events ----------
+  $("save-user").onclick = function () {
+    var name = $("new-user-name").value.trim();
+    if (!name) { toast("Enter a name"); return; }
+    if (state.users.some(function (u) { return u.toLowerCase() === name.toLowerCase(); })) {
+      toast("That member already exists"); return;
+    }
+    addUserRemote(name).then(function () {
+      $("new-user-name").value = "";
+      closeModal("modal-user"); renderLogin();
+      toast(name + " added");
+    });
+  };
+  $("new-user-name").addEventListener("keydown", function (e) { if (e.key === "Enter") $("save-user").click(); });
+
+  $("btn-add-task").onclick = function () { openModal("modal-task"); setTimeout(function(){ $("new-task-title").focus(); }, 50); };
+  $("save-task").onclick = function () {
+    var title = $("new-task-title").value.trim();
+    if (!title) { toast("Enter a task title"); return; }
+    addTaskRemote(title, $("new-task-desc").value.trim()).then(function () {
+      $("new-task-title").value = ""; $("new-task-desc").value = "";
+      closeModal("modal-task"); renderTasks();
+      toast("Task created");
+    });
+  };
+  $("new-task-title").addEventListener("keydown", function (e) {
+    if (e.key === "Enter") { e.preventDefault(); $("new-task-desc").focus(); }
+  });
+
+  $("btn-back").onclick = function () { activeTaskId = null; show("screen-tasks"); renderTasks(); };
+  $("btn-post").onclick = function () { postUpdate("update"); };
+  $("btn-noupdate").onclick = function () { postUpdate("noupdate"); };
+
+  $("btn-report").onclick = openReport;
+  $("btn-copy-report").onclick = function () {
+    var text = $("report-box").textContent;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () { toast("Report copied"); },
+        function () { fallbackCopy(text); });
+    } else { fallbackCopy(text); }
+  };
+  function fallbackCopy(text) {
+    var ta = document.createElement("textarea"); ta.value = text;
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand("copy"); toast("Report copied"); }
+    catch (e) { toast("Copy failed — select manually"); }
+    document.body.removeChild(ta);
+  }
+
+  document.querySelectorAll("#filter-tabs button").forEach(function (b) {
+    b.onclick = function () {
+      filter = b.getAttribute("data-filter");
+      document.querySelectorAll("#filter-tabs button").forEach(function (x) { x.classList.remove("active"); });
+      b.classList.add("active");
+      renderTasks();
+    };
+  });
+
+  // ---------- Starfield ----------
+  (function () {
+    var c = $("starfield"), x = c.getContext("2d"), stars = [], w, h;
+    function resize() {
+      w = c.width = window.innerWidth; h = c.height = window.innerHeight;
+      stars = [];
+      var n = Math.min(220, Math.floor(w * h / 9000));
+      for (var i = 0; i < n; i++) {
+        stars.push({ x: Math.random() * w, y: Math.random() * h,
+          r: Math.random() * 1.4 + 0.2, a: Math.random(), s: Math.random() * 0.015 + 0.003 });
+      }
+    }
+    function tick() {
+      x.clearRect(0, 0, w, h);
+      for (var i = 0; i < stars.length; i++) {
+        var st = stars[i];
+        st.a += st.s; if (st.a > 1 || st.a < 0) st.s = -st.s;
+        x.globalAlpha = Math.abs(st.a) * 0.8 + 0.1;
+        x.fillStyle = i % 7 === 0 ? "#9ad8ff" : "#ffffff";
+        x.beginPath(); x.arc(st.x, st.y, st.r, 0, Math.PI * 2); x.fill();
+      }
+      requestAnimationFrame(tick);
+    }
+    window.addEventListener("resize", resize);
+    resize(); tick();
+  })();
+
+  $("banner-dismiss").onclick = function () { $("mode-banner").classList.add("hidden"); };
+
+  // Periodically pull shared changes from the cloud (preserves the compose box).
+  function softSync() {
+    if (!useCloud || !state.currentUser) return;
+    // Don't yank the UI out from under an in-progress edit.
+    if (editingId !== null) return;
+    refresh().then(function () {
+      renderSession();
+      if (!$("screen-tasks").classList.contains("hidden")) renderTasks();
+      if (!$("screen-detail").classList.contains("hidden")) renderDetail();
+    });
+  }
+
+  // ---------- Boot ----------
+  function boot() {
+    if (!useCloud) $("mode-banner").classList.remove("hidden");
+    var ready = useCloud ? refresh().then(seedUsers) : Promise.resolve();
+    ready.then(function () { route(); });
+    if (useCloud) setInterval(softSync, POLL_MS);
+  }
+  boot();
+})();
+</script>
+</body>
+</html>
