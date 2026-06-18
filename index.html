@@ -285,6 +285,8 @@
   }
   .update .edit-btn { margin-left: 10px; padding: 3px 10px; font-size: 11.5px; opacity: 0.6; }
   .update .edit-btn:hover { opacity: 1; }
+  .update .del-btn { margin-left: 6px; padding: 3px 10px; font-size: 11.5px; opacity: 0.6; }
+  .update .del-btn:hover { opacity: 1; color: var(--danger); }
   .update .edit-area { padding-left: 40px; }
   .update .edit-area textarea {
     width: 100%; min-height: 70px; resize: vertical;
@@ -619,6 +621,11 @@
     if (u) { u.text = text; u.edited = Date.now(); saveLocal(); }
     return Promise.resolve();
   }
+  function deleteUpdateRemote(id) {
+    if (useCloud) return sb.from("updates").delete().eq("id", id).then(refresh);
+    state.updates = state.updates.filter(function (x) { return x.id !== id; });
+    saveLocal(); return Promise.resolve();
+  }
 
   // ---------- Helpers ----------
   function $(id) { return document.getElementById(id); }
@@ -815,11 +822,19 @@
       head.appendChild(nm);
       if (u.type === "noupdate") head.appendChild(el("span", "tag", "No Updates"));
       head.appendChild(el("span", "time", fmtDateTime(u.ts) + (u.edited ? " • edited" : "")));
-      // Only the author can edit their own text update.
-      if (u.type !== "noupdate" && u.author === state.currentUser) {
+      var isOwner = u.author === state.currentUser;
+      var isAdmin = state.currentUser === ADMIN;
+      // Author can edit their own text update.
+      if (u.type !== "noupdate" && isOwner) {
         var editBtn = el("button", "btn small ghost edit-btn", "Edit");
         editBtn.onclick = function () { startEdit(up, u); };
         head.appendChild(editBtn);
+      }
+      // Author (or admin) can delete the entry.
+      if (isOwner || isAdmin) {
+        var delBtn = el("button", "btn small ghost del-btn", "Delete");
+        delBtn.onclick = function () { confirmDelete(u, delBtn); };
+        head.appendChild(delBtn);
       }
       up.appendChild(head);
       var body = el("div", "body", u.type === "noupdate" ? "Logged no updates for this task." : esc(u.text));
@@ -850,6 +865,24 @@
       saveB.disabled = cancelB.disabled = true;
       editUpdateRemote(u.id, text).then(function () { editingId = null; renderDetail(); toast("Update edited"); });
     };
+  }
+
+  // Two-click inline confirm before deleting an entry.
+  function confirmDelete(u, btn) {
+    if (btn.dataset.armed === "1") {
+      btn.disabled = true; btn.textContent = "Deleting...";
+      deleteUpdateRemote(u.id).then(function () { renderDetail(); toast("Update deleted"); });
+      return;
+    }
+    btn.dataset.armed = "1";
+    btn.textContent = "Confirm?";
+    btn.classList.add("danger");
+    editingId = u.id;   // pause auto-refresh so the confirm prompt isn't wiped
+    clearTimeout(btn._t);
+    btn._t = setTimeout(function () {
+      btn.dataset.armed = "0"; btn.textContent = "Delete";
+      btn.classList.remove("danger"); editingId = null;
+    }, 4000);
   }
 
   function postUpdate(type) {
